@@ -1,7 +1,7 @@
-import React, { useState, useEffect, useMemo } from 'react';
-import { fetchAllGen3Pokemons, fetchPokemonByName } from './services/pokeApi';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
+import { fetchAllGen3Pokemons, fetchPokemonByName, fetchStatBatch } from './services/pokeApi';
 import { analyzeTeam, comparePokemons, compareTeams } from './services/groqApi';
-import { BrainCircuit, Loader2, Sparkles, X, Info, MoreVertical, Activity, Volume2, Database, Search, ArrowDownAZ, Filter, Swords, ShieldHalf, Users } from 'lucide-react';
+import { BrainCircuit, Loader2, Sparkles, X, Info, Activity, Volume2, Database, Search, ArrowDownAZ, Filter, Swords, ShieldHalf, Users, BookOpen } from 'lucide-react';
 import './App.css';
 
 function App() {
@@ -12,6 +12,10 @@ function App() {
   const [searchTerm, setSearchTerm] = useState('');
   const [sortOrder, setSortOrder] = useState('id-asc');
   const [typeFilter, setTypeFilter] = useState('all');
+
+  // Stat cache for sort (loaded in background)
+  const [statCache, setStatCache] = useState({});
+  const statLoadedRef = useRef(false);
 
   const [team, setTeam] = useState([]);
   const [teamB, setTeamB] = useState([]);
@@ -39,6 +43,11 @@ function App() {
     try {
       const data = await fetchAllGen3Pokemons();
       setPokemons(data);
+      // Kick off background stat fetch once list is ready
+      if (!statLoadedRef.current) {
+        statLoadedRef.current = true;
+        fetchStatBatch(data.map(p => p.id), (partial) => setStatCache(partial));
+      }
     } catch (err) {
       console.error(err);
       setError("Failed to fetch initial Pokemon database");
@@ -63,16 +72,34 @@ function App() {
       result = result.filter(p => p.types.includes(typeFilter));
     }
     
+    const STAT_MAP = {
+      'hp-asc':      (a, b) => (statCache[a.id]?.hp || 0) - (statCache[b.id]?.hp || 0),
+      'hp-desc':     (a, b) => (statCache[b.id]?.hp || 0) - (statCache[a.id]?.hp || 0),
+      'atk-asc':     (a, b) => (statCache[a.id]?.attack || 0) - (statCache[b.id]?.attack || 0),
+      'atk-desc':    (a, b) => (statCache[b.id]?.attack || 0) - (statCache[a.id]?.attack || 0),
+      'def-asc':     (a, b) => (statCache[a.id]?.defense || 0) - (statCache[b.id]?.defense || 0),
+      'def-desc':    (a, b) => (statCache[b.id]?.defense || 0) - (statCache[a.id]?.defense || 0),
+      'spatk-asc':   (a, b) => (statCache[a.id]?.['special-attack'] || 0) - (statCache[b.id]?.['special-attack'] || 0),
+      'spatk-desc':  (a, b) => (statCache[b.id]?.['special-attack'] || 0) - (statCache[a.id]?.['special-attack'] || 0),
+      'spdef-asc':   (a, b) => (statCache[a.id]?.['special-defense'] || 0) - (statCache[b.id]?.['special-defense'] || 0),
+      'spdef-desc':  (a, b) => (statCache[b.id]?.['special-defense'] || 0) - (statCache[a.id]?.['special-defense'] || 0),
+      'spd-asc':     (a, b) => (statCache[a.id]?.speed || 0) - (statCache[b.id]?.speed || 0),
+      'spd-desc':    (a, b) => (statCache[b.id]?.speed || 0) - (statCache[a.id]?.speed || 0),
+      'total-asc':   (a, b) => (statCache[a.id]?.total || 0) - (statCache[b.id]?.total || 0),
+      'total-desc':  (a, b) => (statCache[b.id]?.total || 0) - (statCache[a.id]?.total || 0),
+    };
+
     result = [...result].sort((a, b) => {
-       if (sortOrder === 'id-asc') return a.id - b.id;
-       if (sortOrder === 'id-desc') return b.id - a.id;
+       if (sortOrder === 'id-asc')   return a.id - b.id;
+       if (sortOrder === 'id-desc')  return b.id - a.id;
        if (sortOrder === 'name-asc') return a.name.localeCompare(b.name);
-       if (sortOrder === 'name-desc') return b.name.localeCompare(a.name);
+       if (sortOrder === 'name-desc')return b.name.localeCompare(a.name);
+       if (STAT_MAP[sortOrder])      return STAT_MAP[sortOrder](a, b);
        return 0;
     });
     
     return result;
-  }, [pokemons, searchTerm, typeFilter, sortOrder]);
+  }, [pokemons, searchTerm, typeFilter, sortOrder, statCache]);
 
   const toggleMode = (mode) => {
     setAppMode(mode);
@@ -167,7 +194,6 @@ function App() {
       setAnalyzing(false);
     }
   };
-
   const openDetails = async (e, pObj, isCounter = false) => {
     e.stopPropagation();
     if (isCounter && pObj.data) {
@@ -180,6 +206,52 @@ function App() {
             setDetailedPokemon({ type: 'grid', data: detailedData });
         }
     }
+  };
+
+  // Custom Dropdown Component
+  const CustomSelect = ({ value, onChange, options, icon: Icon, placeholder }) => {
+    const [isOpen, setIsOpen] = useState(false);
+    const dropdownRef = useRef(null);
+
+    useEffect(() => {
+      const handleClickOutside = (event) => {
+        if (dropdownRef.current && !dropdownRef.current.contains(event.target)) {
+          setIsOpen(false);
+        }
+      };
+      document.addEventListener('mousedown', handleClickOutside);
+      return () => document.removeEventListener('mousedown', handleClickOutside);
+    }, []);
+
+    const selectedOption = options.find(opt => opt.value === value) || options[0];
+
+    return (
+      <div className="custom-select-container" ref={dropdownRef}>
+        <div className={`custom-select-trigger ${isOpen ? 'active' : ''}`} onClick={() => setIsOpen(!isOpen)}>
+          {Icon && <Icon size={16} />}
+          <span className="selected-label">{selectedOption.label}</span>
+          <svg className={`chevron ${isOpen ? 'open' : ''}`} viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
+            <polyline points="6 9 12 15 18 9"></polyline>
+          </svg>
+        </div>
+        {isOpen && (
+          <div className="custom-select-options">
+            {options.map((opt) => (
+              <div 
+                key={opt.value} 
+                className={`custom-option ${opt.value === value ? 'selected' : ''}`}
+                onClick={() => {
+                  onChange(opt.value);
+                  setIsOpen(false);
+                }}
+              >
+                {opt.label}
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+    );
   };
 
   const limitConfig = appMode === 'counter' ? 6 : (appMode === 'compare' ? 2 : 6);
@@ -214,40 +286,52 @@ function App() {
            </div>
            
            <div className="filter-controls">
-             <div className="filter-group">
-                <Filter size={16} />
-                <select value={typeFilter} onChange={e => setTypeFilter(e.target.value)}>
-                   <option value="all">All Types</option>
-                   <option value="normal">Normal</option>
-                   <option value="fire">Fire</option>
-                   <option value="water">Water</option>
-                   <option value="grass">Grass</option>
-                   <option value="electric">Electric</option>
-                   <option value="ice">Ice</option>
-                   <option value="fighting">Fighting</option>
-                   <option value="poison">Poison</option>
-                   <option value="ground">Ground</option>
-                   <option value="flying">Flying</option>
-                   <option value="psychic">Psychic</option>
-                   <option value="bug">Bug</option>
-                   <option value="rock">Rock</option>
-                   <option value="ghost">Ghost</option>
-                   <option value="dragon">Dragon</option>
-                   <option value="dark">Dark</option>
-                   <option value="steel">Steel</option>
-                   <option value="fairy">Fairy</option>
-                </select>
-             </div>
-             
-             <div className="filter-group">
-                <ArrowDownAZ size={16} />
-                <select value={sortOrder} onChange={e => setSortOrder(e.target.value)}>
-                   <option value="id-asc">Lowest ID</option>
-                   <option value="id-desc">Highest ID</option>
-                   <option value="name-asc">A - Z</option>
-                   <option value="name-desc">Z - A</option>
-                </select>
-             </div>
+             <CustomSelect 
+               value={typeFilter} 
+               onChange={setTypeFilter}
+               icon={Filter}
+               options={[
+                 { value: 'all', label: 'All Types' },
+                 { value: 'normal', label: 'Normal' },
+                 { value: 'fire', label: 'Fire' },
+                 { value: 'water', label: 'Water' },
+                 { value: 'grass', label: 'Grass' },
+                 { value: 'electric', label: 'Electric' },
+                 { value: 'ice', label: 'Ice' },
+                 { value: 'fighting', label: 'Fighting' },
+                 { value: 'poison', label: 'Poison' },
+                 { value: 'ground', label: 'Ground' },
+                 { value: 'flying', label: 'Flying' },
+                 { value: 'psychic', label: 'Psychic' },
+                 { value: 'bug', label: 'Bug' },
+                 { value: 'rock', label: 'Rock' },
+                 { value: 'ghost', label: 'Ghost' },
+                 { value: 'dragon', label: 'Dragon' },
+                 { value: 'dark', label: 'Dark' },
+                 { value: 'steel', label: 'Steel' },
+                 { value: 'fairy', label: 'Fairy' },
+               ]}
+             />
+
+             <CustomSelect 
+               value={sortOrder} 
+               onChange={setSortOrder}
+               icon={ArrowDownAZ}
+               options={[
+                 { value: 'id-asc', label: 'Lowest ID' },
+                 { value: 'id-desc', label: 'Highest ID' },
+                 { value: 'name-asc', label: 'A - Z' },
+                 { value: 'name-desc', label: 'Z - A' },
+                 { value: 'total-desc', label: 'Stat Total (High)' },
+                 { value: 'total-asc', label: 'Stat Total (Low)' },
+                 { value: 'hp-desc', label: 'HP (High)' },
+                 { value: 'atk-desc', label: 'Attack (High)' },
+                 { value: 'def-desc', label: 'Defense (High)' },
+                 { value: 'spatk-desc', label: 'Sp. Atk (High)' },
+                 { value: 'spdef-desc', label: 'Sp. Def (High)' },
+                 { value: 'spd-desc', label: 'Speed (High)' },
+               ]}
+             />
            </div>
         </div>
 
@@ -674,6 +758,16 @@ function App() {
             </div>
             
             <div className="modal-body-scroll">
+                {detailedPokemon.data.genus && (
+                  <div className="pokemon-genus" style={{fontSize: '0.7rem', color: 'var(--accent)', fontWeight: 900, textTransform: 'uppercase', letterSpacing: '2px', marginBottom: '0.5rem'}}>
+                    {detailedPokemon.data.genus}
+                  </div>
+                )}
+                {detailedPokemon.data.flavorText && (
+                  <div className="modal-section flavor-text" style={{marginBottom: '1.5rem', borderLeft: '3px solid var(--accent)', paddingLeft: '1rem', fontStyle: 'italic', fontSize: '0.85rem', color: 'var(--text-main)', opacity: 0.9}}>
+                    {detailedPokemon.data.flavorText}
+                  </div>
+                )}
                 {detailedPokemon.type === 'counter' && detailedPokemon.reason && (
                   <div className="modal-section ai-reasoning">
                     <h3><Info size={16} /> Strategy Explanation</h3>

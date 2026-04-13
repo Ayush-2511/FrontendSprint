@@ -19,14 +19,17 @@
   padding: 0;
 }
 
+#root {
+  height: 100%;
+}
+
 body {
   font-family: 'Courier New', monospace;
   background: var(--bg-dark);
   background-image: var(--custom-bg-pattern);
   color: var(--text-main);
-  min-height: 100vh;
-  padding: 0;
-  margin: 0;
+  height: 100%;
+  overflow: hidden;
 }
 
 h1, h2, h3, h4 {

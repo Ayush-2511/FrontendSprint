@@ -30,10 +30,33 @@ export const fetchAllGen3Pokemons = async () => {
       id,
       name: p.name,
       image: `https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/${id}.png`,
-      types: typeMap[p.name] || ['normal'] // safe fallback
+      types: typeMap[p.name] || ['normal']
     };
   });
 };
+
+// Fetch base stats for a list of pokemon IDs in a background batch
+export const fetchStatBatch = async (ids, onProgress) => {
+  const BATCH = 20;
+  const cache = {};
+  for (let i = 0; i < ids.length; i += BATCH) {
+    const slice = ids.slice(i, i + BATCH);
+    await Promise.all(slice.map(async id => {
+      try {
+        const res = await fetch(`${BASE_URL}/${id}`);
+        if (!res.ok) return;
+        const d = await res.json();
+        const stats = {};
+        d.stats.forEach(s => { stats[s.stat.name] = s.base_stat; });
+        stats.total = d.stats.reduce((sum, s) => sum + s.base_stat, 0);
+        cache[id] = stats;
+      } catch(_) {}
+    }));
+    if (onProgress) onProgress({ ...cache });
+  }
+  return cache;
+};
+
 
 export const fetchPokemonByName = async (name) => {
   try {
@@ -41,6 +64,22 @@ export const fetchPokemonByName = async (name) => {
     const pRes = await fetch(`${BASE_URL}/${formattedName}`);
     if (!pRes.ok) return null;
     const detail = await pRes.json();
+
+    // Fetch species for flavor text + genus
+    let flavorText = null;
+    let genus = null;
+    try {
+      const speciesRes = await fetch(detail.species.url);
+      if (speciesRes.ok) {
+        const speciesData = await speciesRes.json();
+        // Pick the first English flavor text, clean up form-feed chars
+        const entry = speciesData.flavor_text_entries.find(e => e.language.name === 'en');
+        if (entry) flavorText = entry.flavor_text.replace(/[\f\n]/g, ' ').replace(/\s+/g, ' ').trim();
+        const gen = speciesData.genera.find(g => g.language.name === 'en');
+        if (gen) genus = gen.genus;
+      }
+    } catch (_) { /* species fetch is best-effort */ }
+
     return {
       id: detail.id,
       name: detail.name,
@@ -51,9 +90,12 @@ export const fetchPokemonByName = async (name) => {
       weight: detail.weight,
       base_experience: detail.base_experience,
       abilities: detail.abilities.map(a => ({ name: a.ability.name, is_hidden: a.is_hidden })),
-      cry: detail.cries ? detail.cries.latest : null
+      cry: detail.cries ? detail.cries.latest : null,
+      flavorText,
+      genus,
     };
   } catch (e) {
     return null;
   }
 };
+
