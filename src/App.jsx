@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { fetchAllGen3Pokemons, fetchPokemonByName } from './services/pokeApi';
-import { analyzeTeam, comparePokemons } from './services/groqApi';
-import { BrainCircuit, Loader2, Sparkles, X, Info, MoreVertical, Activity, Volume2, Database, Search, ArrowDownAZ, Filter, Swords, ShieldHalf } from 'lucide-react';
+import { analyzeTeam, comparePokemons, compareTeams } from './services/groqApi';
+import { BrainCircuit, Loader2, Sparkles, X, Info, MoreVertical, Activity, Volume2, Database, Search, ArrowDownAZ, Filter, Swords, ShieldHalf, Users } from 'lucide-react';
 import './App.css';
 
 function App() {
@@ -14,9 +14,11 @@ function App() {
   const [typeFilter, setTypeFilter] = useState('all');
 
   const [team, setTeam] = useState([]);
+  const [teamB, setTeamB] = useState([]);
+  const [draftingTarget, setDraftingTarget] = useState('A');
   
   // Modes
-  const [appMode, setAppMode] = useState('counter'); // 'counter' or 'compare'
+  const [appMode, setAppMode] = useState('counter'); // 'counter', 'compare', 'team_compare'
 
   // Counter Mode State
   const [allowLegendaries, setAllowLegendaries] = useState(false);
@@ -75,26 +77,48 @@ function App() {
   const toggleMode = (mode) => {
     setAppMode(mode);
     setTeam([]);
+    setTeamB([]);
+    setDraftingTarget('A');
     setCounterPokemons([]);
     setComparisonData(null);
     setError(null);
   };
 
-  const togglePokemon = (pokemon) => {
-    setTeam(prev => {
-      const isSelected = prev.find(p => p.id === pokemon.id);
-      if (isSelected) {
-        return prev.filter(p => p.id !== pokemon.id);
+  const togglePokemon = (pokemon, forceTarget = null) => {
+    if (appMode === 'team_compare') {
+      const target = forceTarget || draftingTarget;
+      if (target === 'A') {
+        setTeam(prev => {
+          const isSelected = prev.find(p => p.id === pokemon.id);
+          if (isSelected) return prev.filter(p => p.id !== pokemon.id);
+          if (prev.length >= 6) return prev;
+          return [...prev, pokemon];
+        });
       } else {
-        const limit = appMode === 'counter' ? 6 : 2;
-        if (prev.length >= limit) return prev;
-        return [...prev, pokemon];
+        setTeamB(prev => {
+          const isSelected = prev.find(p => p.id === pokemon.id);
+          if (isSelected) return prev.filter(p => p.id !== pokemon.id);
+          if (prev.length >= 6) return prev;
+          return [...prev, pokemon];
+        });
       }
-    });
+    } else {
+      setTeam(prev => {
+        const isSelected = prev.find(p => p.id === pokemon.id);
+        if (isSelected) {
+          return prev.filter(p => p.id !== pokemon.id);
+        } else {
+          const limit = appMode === 'counter' ? 6 : 2;
+          if (prev.length >= limit) return prev;
+          return [...prev, pokemon];
+        }
+      });
+    }
   };
 
   const handleAction = async () => {
-    if (team.length === 0) return;
+    if (appMode === 'team_compare' && (team.length === 0 || teamB.length === 0)) return;
+    if (appMode !== 'team_compare' && team.length === 0) return;
     setAnalyzing(true);
     setError(null);
     setDetailedPokemon(null);
@@ -112,7 +136,7 @@ function App() {
               })
             );
             setCounterPokemons(hydratedTeam);
-        } else {
+        } else if (appMode === 'compare') {
             if (team.length !== 2) throw new Error("Please select exactly 2 Pokemon to duel.");
             setComparisonData(null);
             
@@ -121,8 +145,19 @@ function App() {
             const p2Data = await fetchPokemonByName(team[1].name);
             
             setComparisonData({
+                type: 'single',
                 p1: p1Data,
                 p2: p2Data,
+                analysis: result
+            });
+        } else if (appMode === 'team_compare') {
+            setComparisonData(null);
+            const result = await compareTeams(team, teamB);
+            
+            setComparisonData({
+                type: 'team',
+                teamA: team,
+                teamB: teamB,
                 analysis: result
             });
         }
@@ -147,18 +182,29 @@ function App() {
     }
   };
 
-  const limitConfig = appMode === 'counter' ? 6 : 2;
+  const limitConfig = appMode === 'counter' ? 6 : (appMode === 'compare' ? 2 : 6);
+
+  const getHeaderTitle = () => {
+     if (appMode === 'counter') return 'Smart Counter-Team Builder';
+     if (appMode === 'compare') return 'Hypothetical Duel Analyst';
+     return 'Team Warfare Matchup';
+  };
+
+  const getHeaderSubtitle = () => {
+     if (appMode === 'counter') return "Select the Opponent's Pokemon team (up to 6) to generate a flawless Counter-Team";
+     if (appMode === 'compare') return "Select exactly 2 Pokemon to analyze their hypothetical duel Matchup";
+     return "Draft two Pokemon teams (up to 6 each) to simulate a full roster vs roster battle.";
+  };
 
   return (
     <div className="app-container">
       <main>
         <div className="header">
-          <h1>{appMode === 'counter' ? 'Smart Counter-Team Builder' : 'Hypothetical Duel Analyst'}</h1>
-          <p>
-            {appMode === 'counter' 
-              ? "Select the Opponent's Pokemon team (up to 6) to generate a flawless Counter-Team"
-              : "Select exactly 2 Pokemon to analyze their hypothetical duel Matchup"}
-          </p>
+          <div className="header-topbar">POKÉMON // AI BATTLE SYSTEM v2.0</div>
+          <h1>
+            {getHeaderTitle()}
+          </h1>
+          <p>{getHeaderSubtitle()}</p>
         </div>
 
         <div className="filter-header">
@@ -205,45 +251,72 @@ function App() {
            </div>
         </div>
 
-        {loadingList ? (
-          <div className="loader-container" style={{marginTop: '4rem'}}>
-            <Loader2 className="spinner" style={{width: 50, height: 50, border: 'none'}} />
-            <p style={{fontSize: '1.2rem', color: '#fff'}}>Booting Pokedex Database...</p>
-          </div>
-        ) : (
-          <div className="pokemons-grid">
-            {filteredAndSortedPokemons.map((pokemon) => {
-              const isSelected = team.find(p => p.id === pokemon.id);
-              const isDisabled = !isSelected && team.length >= limitConfig;
-              
-              return (
-                <div 
-                  key={pokemon.id}
-                  className={`pokemon-card ${isSelected ? 'selected' : ''} ${isDisabled ? 'disabled' : ''}`}
-                  onClick={() => {
-                    if (!isDisabled || isSelected) togglePokemon(pokemon);
-                  }}
-                >
-                  <div className="pokemon-card-header">
-                     <span className="pokemon-id">#{pokemon.id.toString().padStart(3, '0')}</span>
-                     <button className="more-btn" onClick={(e) => openDetails(e, pokemon, false)}>
-                       <MoreVertical size={16} />
-                     </button>
+        <div className="poke-grid-panel">
+          {loadingList ? (
+            <div className="loader-container" style={{marginTop: '4rem'}}>
+              <Loader2 className="spinner" style={{width: 50, height: 50, border: 'none'}} />
+              <p style={{fontSize: '0.85rem', letterSpacing: '3px', textTransform: 'uppercase', color: 'var(--text-muted)'}}>BOOTING POKÉDEX DATABASE...</p>
+            </div>
+          ) : (
+            <div className="pokemons-grid">
+              {filteredAndSortedPokemons.map((pokemon) => {
+                const isSelectedA = team.find(p => p.id === pokemon.id);
+                const isSelectedB = teamB.find(p => p.id === pokemon.id);
+                
+                let isSelected = false;
+                let isDisabled = false;
+                let teamClass = '';
+
+                if (appMode === 'team_compare') {
+                  if (draftingTarget === 'A') {
+                    isSelected = isSelectedA;
+                    isDisabled = !isSelected && team.length >= 6;
+                    teamClass = isSelected ? 'selected-team-a' : (isSelectedB ? 'selected-team-b-inactive' : '');
+                  } else {
+                    isSelected = isSelectedB;
+                    isDisabled = !isSelected && teamB.length >= 6;
+                    teamClass = isSelected ? 'selected-team-b' : (isSelectedA ? 'selected-team-a-inactive' : '');
+                  }
+                } else {
+                  isSelected = isSelectedA;
+                  isDisabled = !isSelected && team.length >= limitConfig;
+                  teamClass = isSelected ? 'selected' : '';
+                }
+                
+                return (
+                  <div 
+                    key={pokemon.id}
+                    className={`pokemon-card ${teamClass} ${isDisabled ? 'disabled' : ''}`}
+                    onClick={() => {
+                      if (!isDisabled || isSelected) togglePokemon(pokemon);
+                    }}
+                  >
+                    <div className="pokemon-card-header">
+                       <span className="pokemon-id">#{pokemon.id.toString().padStart(3, '0')}</span>
+                       <button className="pokeball-override-btn" onClick={(e) => openDetails(e, pokemon, false)} title="View Details">
+                         {/* POKEBALL SVG PLACEHOLDER — drop your SVG here */}
+                         <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2">
+                           <circle cx="12" cy="12" r="10"/>
+                           <line x1="2" y1="12" x2="22" y2="12"/>
+                           <circle cx="12" cy="12" r="3" fill="currentColor"/>
+                         </svg>
+                       </button>
+                    </div>
+                    <div className="pokemon-image-container">
+                      <img src={pokemon.image} alt={pokemon.name} className="pokemon-image" loading="lazy" />
+                    </div>
+                    <div className="pokemon-name">{pokemon.name}</div>
+                    <div className="pokemon-types">
+                      {pokemon.types.map(type => (
+                        <span key={type} className="type-badge">{type}</span>
+                      ))}
+                    </div>
                   </div>
-                  <div className="pokemon-image-container">
-                    <img src={pokemon.image} alt={pokemon.name} className="pokemon-image" loading="lazy" />
-                  </div>
-                  <div className="pokemon-name">{pokemon.name}</div>
-                  <div className="pokemon-types">
-                    {pokemon.types.map(type => (
-                      <span key={type} className="type-badge">{type}</span>
-                    ))}
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        )}
+                );
+              })}
+            </div>
+          )}
+        </div>
       </main>
 
       <aside>
@@ -255,30 +328,79 @@ function App() {
              <button className={`mode-tab ${appMode === 'compare' ? 'active' : ''}`} onClick={() => toggleMode('compare')}>
                <Swords size={16} /> Duel
              </button>
+             <button className={`mode-tab ${appMode === 'team_compare' ? 'active' : ''}`} onClick={() => toggleMode('team_compare')}>
+               <Users size={16} /> Teams
+             </button>
           </div>
 
           <h2>
-            {appMode === 'counter' ? "Opponent's Team" : "Duel Matchup"}
-            <span className="team-count">{team.length} / {limitConfig}</span>
+            {appMode === 'counter' ? "Opponent's Team" : (appMode === 'compare' ? "Duel Matchup" : "Draft Teams")}
+            {appMode !== 'team_compare' && <span className="team-count">{team.length} / {limitConfig}</span>}
           </h2>
           
-          <div className="selected-slots" style={{ gridTemplateColumns: appMode === 'compare' ? 'repeat(2, 1fr)' : 'repeat(3, 1fr)' }}>
-            {Array.from({ length: limitConfig }).map((_, i) => {
-              const p = team[i];
-              return (
-                <div key={i} className={`selected-slot ${p ? 'filled' : ''}`}>
-                  {p && (
-                    <>
-                      <img src={p.image} alt={p.name} />
-                      <button className="remove-btn" onClick={() => togglePokemon(p)}>
-                        <X size={14} />
-                      </button>
-                    </>
-                  )}
-                </div>
-              );
-            })}
-          </div>
+          {appMode === 'team_compare' ? (
+            <div className="team-split-draft">
+               <div className={`draft-side ${draftingTarget === 'A' ? 'active' : ''}`} onClick={() => setDraftingTarget('A')}>
+                 <h3 style={{display: 'flex', justifyContent: 'space-between'}}>Team A <span className="team-count">{team.length} / 6</span></h3>
+                 <div className="selected-slots" style={{ gridTemplateColumns: 'repeat(3, 1fr)' }}>
+                    {Array.from({ length: 6 }).map((_, i) => {
+                      const p = team[i];
+                      return (
+                        <div key={i} className={`selected-slot ${p ? 'filled' : ''}`}>
+                          {p && (
+                            <>
+                              <img src={p.image} alt={p.name} />
+                              <button className="remove-btn" onClick={(e) => { e.stopPropagation(); togglePokemon(p, 'A'); }}>
+                                <X size={14} />
+                              </button>
+                            </>
+                          )}
+                        </div>
+                      );
+                    })}
+                 </div>
+               </div>
+               
+               <div className={`draft-side ${draftingTarget === 'B' ? 'active' : ''}`} onClick={() => setDraftingTarget('B')} style={{marginTop: '1.5rem'}}>
+                 <h3 style={{display: 'flex', justifyContent: 'space-between'}}>Team B <span className="team-count">{teamB.length} / 6</span></h3>
+                 <div className="selected-slots" style={{ gridTemplateColumns: 'repeat(3, 1fr)' }}>
+                    {Array.from({ length: 6 }).map((_, i) => {
+                      const p = teamB[i];
+                      return (
+                        <div key={i} className={`selected-slot ${p ? 'filled' : ''}`}>
+                          {p && (
+                            <>
+                              <img src={p.image} alt={p.name} />
+                              <button className="remove-btn" onClick={(e) => { e.stopPropagation(); togglePokemon(p, 'B'); }}>
+                                <X size={14} />
+                              </button>
+                            </>
+                          )}
+                        </div>
+                      );
+                    })}
+                 </div>
+               </div>
+            </div>
+          ) : (
+            <div className="selected-slots" style={{ gridTemplateColumns: appMode === 'compare' ? 'repeat(2, 1fr)' : 'repeat(3, 1fr)' }}>
+              {Array.from({ length: limitConfig }).map((_, i) => {
+                const p = team[i];
+                return (
+                  <div key={i} className={`selected-slot ${p ? 'filled' : ''}`}>
+                    {p && (
+                      <>
+                        <img src={p.image} alt={p.name} />
+                        <button className="remove-btn" onClick={() => togglePokemon(p)}>
+                          <X size={14} />
+                        </button>
+                      </>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          )}
 
           {appMode === 'counter' ? (
               <div className="settings-panel">
@@ -311,22 +433,31 @@ function App() {
                      </label>
                 </div>
               </div>
-          ) : (
+          ) : (appMode === 'compare' ? (
               <div className="settings-panel" style={{textAlign: 'center', color: 'var(--text-muted)', fontSize: '0.9rem'}}>
                  Pick exactly 2 Pokemon from the Pokedex to simulate an AI esports matchup.
               </div>
-          )}
+          ) : (
+              <div className="settings-panel" style={{textAlign: 'center', color: 'var(--text-muted)', fontSize: '0.9rem'}}>
+                 Draft 1 to 6 Pokemon per team for analysis. Click Team A or Team B above to focus drafting.
+              </div>
+          ))}
 
           <button 
             className="action-btn"
-            disabled={team.length === 0 || analyzing || (appMode === 'compare' && team.length !== 2)}
+            disabled={
+               (appMode === 'team_compare' && (team.length === 0 || teamB.length === 0)) ||
+               (appMode !== 'team_compare' && team.length === 0) || 
+               analyzing || 
+               (appMode === 'compare' && team.length !== 2)
+            }
             onClick={handleAction}
           >
             {analyzing 
                ? <Loader2 className="spinner" style={{width: 20, height: 20, margin: 0, border: 'none' }} /> 
-               : (appMode === 'compare' ? <Swords size={20} /> : <Sparkles size={20} />)
+               : (appMode === 'compare' ? <Swords size={20} /> : (appMode === 'team_compare' ? <Users size={20} /> : <Sparkles size={20} />))
             }
-            {analyzing ? 'Processing...' : (appMode === 'compare' ? 'Analyze Duel' : 'Generate Counter')}
+            {analyzing ? 'Processing...' : (appMode === 'compare' ? 'Analyze Duel' : (appMode === 'team_compare' ? 'Analyze Teams' : 'Generate Counter'))}
           </button>
 
           {error && (
@@ -374,7 +505,7 @@ function App() {
       )}
 
       {/* Compare Modal Split Screen */}
-      {comparisonData && (
+      {comparisonData && comparisonData.type === 'single' && (
         <div className="modal-overlay" onClick={() => setComparisonData(null)}>
            <div className="vs-modal-content" onClick={e => e.stopPropagation()}>
               <button className="modal-close" onClick={() => setComparisonData(null)}>
@@ -406,7 +537,31 @@ function App() {
                      <p>{comparisonData.analysis.strategic_breakdown}</p>
                   </div>
 
-                  <div className="vs-pros-cons">
+                  <div className="modal-section">
+                     <h3><Activity size={18} /> Base Stats Comparison</h3>
+                     <div className="modal-stats-comparison">
+                        {comparisonData.p1.stats.map((s1, index) => {
+                           const s2 = comparisonData.p2.stats.find(s => s.name === s1.name);
+                           if (!s2) return null;
+                           const diff = s1.value - s2.value;
+                           const diffP1 = diff > 0 ? `(+${diff})` : (diff < 0 ? `(${diff})` : '');
+                           const diffP2 = diff < 0 ? `(+${Math.abs(diff)})` : (diff > 0 ? `(-${diff})` : '');
+                           return (
+                             <div key={s1.name} className="stat-comp-row">
+                                <div className="stat-comp-val p1">
+                                   {s1.value} <span className={diff > 0 ? 'stat-diff-positive' : (diff < 0 ? 'stat-diff-negative' : 'stat-diff-zero')}>{diffP1}</span>
+                                </div>
+                                <div className="stat-comp-name">{s1.name.replace('-', ' ')}</div>
+                                <div className="stat-comp-val p2">
+                                   <span className={diff < 0 ? 'stat-diff-positive' : (diff > 0 ? 'stat-diff-negative' : 'stat-diff-zero')}>{diffP2}</span> {s2.value}
+                                </div>
+                             </div>
+                           );
+                        })}
+                     </div>
+                  </div>
+
+                  <div className="vs-pros-cons" style={{marginTop: '2rem'}}>
                       <div className="fighter-pros-cons" style={{background: 'rgba(59, 130, 246, 0.1)', padding: '1rem', borderRadius: '0.5rem', border: '1px solid rgba(59, 130, 246, 0.3)'}}>
                          <h4 style={{color: '#60a5fa', marginBottom: '1rem', textTransform: 'capitalize'}}>{comparisonData.p1.name} Synergy</h4>
                          <ul style={{listStyle: 'none', padding: 0, margin: 0, fontSize: '0.9rem', color: 'var(--text-main)', lineHeight: 1.5}}>
@@ -421,6 +576,70 @@ function App() {
                          <h4 style={{color: '#f87171', marginBottom: '1rem', textTransform: 'capitalize'}}>{comparisonData.p2.name} Synergy</h4>
                          <ul style={{listStyle: 'none', padding: 0, margin: 0, fontSize: '0.9rem', color: 'var(--text-main)', lineHeight: 1.5}}>
                            {comparisonData.analysis.pokemon2_pros_cons.map((line, i) => (
+                              <li key={i} style={{marginBottom: '0.5rem', display: 'flex', gap: '0.5rem'}}>
+                                  <span style={{color: line.startsWith('Pro') ? '#10b981' : '#ef4444'}}>•</span> {line}
+                              </li>
+                           ))}
+                         </ul>
+                      </div>
+                  </div>
+              </div>
+           </div>
+        </div>
+      )}
+
+      {/* Team Compare Modal */}
+      {comparisonData && comparisonData.type === 'team' && (
+        <div className="modal-overlay" onClick={() => setComparisonData(null)}>
+           <div className="vs-modal-content" onClick={e => e.stopPropagation()}>
+              <button className="modal-close" onClick={() => setComparisonData(null)}>
+                <X size={20} />
+              </button>
+              
+              <div className="vs-header">
+                  <div className="vs-fighter">
+                     <h2>Team A</h2>
+                     <div className="pokemon-types" style={{gap: '0.2rem'}}>
+                       {comparisonData.teamA.map(p => <img key={p.id} src={p.image} style={{width: 40, height: 40}} alt={p.name} title={p.name} />)}
+                     </div>
+                  </div>
+                  <div className="vs-badge">VS</div>
+                  <div className="vs-fighter">
+                     <h2>Team B</h2>
+                     <div className="pokemon-types" style={{gap: '0.2rem'}}>
+                       {comparisonData.teamB.map(p => <img key={p.id} src={p.image} style={{width: 40, height: 40}} alt={p.name} title={p.name} />)}
+                     </div>
+                  </div>
+              </div>
+
+              <div className="vs-body-scroll">
+                  <div className="modal-section ai-reasoning" style={{textAlign: 'center'}}>
+                     <h3 style={{justifyContent: 'center', color: '#c084fc'}}><Users size={18} /> Match Verdict</h3>
+                     <p style={{borderRadius: '0.5rem', borderLeft: 'none', background: 'rgba(192, 132, 252, 0.15)', border: '1px solid rgba(192, 132, 252, 0.4)'}}>
+                        {comparisonData.analysis.verdict}
+                     </p>
+                  </div>
+
+                  <div className="modal-section ai-reasoning">
+                     <h3><BrainCircuit size={18} /> Strategic Breakdown</h3>
+                     <p>{comparisonData.analysis.strategic_breakdown}</p>
+                  </div>
+
+                  <div className="vs-pros-cons">
+                      <div className="fighter-pros-cons" style={{background: 'rgba(59, 130, 246, 0.1)', padding: '1rem', borderRadius: '0.5rem', border: '1px solid rgba(59, 130, 246, 0.3)'}}>
+                         <h4 style={{color: '#60a5fa', marginBottom: '1rem', textTransform: 'capitalize'}}>Team A Synergy</h4>
+                         <ul style={{listStyle: 'none', padding: 0, margin: 0, fontSize: '0.9rem', color: 'var(--text-main)', lineHeight: 1.5}}>
+                           {comparisonData.analysis.team1_pros_cons && comparisonData.analysis.team1_pros_cons.map((line, i) => (
+                              <li key={i} style={{marginBottom: '0.5rem', display: 'flex', gap: '0.5rem'}}>
+                                  <span style={{color: line.startsWith('Pro') ? '#10b981' : '#ef4444'}}>•</span> {line}
+                              </li>
+                           ))}
+                         </ul>
+                      </div>
+                      <div className="fighter-pros-cons" style={{background: 'rgba(239, 68, 68, 0.1)', padding: '1rem', borderRadius: '0.5rem', border: '1px solid rgba(239, 68, 68, 0.3)'}}>
+                         <h4 style={{color: '#f87171', marginBottom: '1rem', textTransform: 'capitalize'}}>Team B Synergy</h4>
+                         <ul style={{listStyle: 'none', padding: 0, margin: 0, fontSize: '0.9rem', color: 'var(--text-main)', lineHeight: 1.5}}>
+                           {comparisonData.analysis.team2_pros_cons && comparisonData.analysis.team2_pros_cons.map((line, i) => (
                               <li key={i} style={{marginBottom: '0.5rem', display: 'flex', gap: '0.5rem'}}>
                                   <span style={{color: line.startsWith('Pro') ? '#10b981' : '#ef4444'}}>•</span> {line}
                               </li>

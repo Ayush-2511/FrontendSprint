@@ -1,15 +1,16 @@
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;800&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Courier+New&display=swap');
 
 :root {
-  --bg-dark: #0f172a;
-  --bg-card: rgba(30, 41, 59, 0.7);
-  --text-main: #f8fafc;
-  --text-muted: #94a3b8;
-  --accent: #3b82f6;
-  --accent-hover: #60a5fa;
-  --glass-border: rgba(255, 255, 255, 0.1);
-  --glass-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37);
-  --success: #10b981;
+  --bg-dark: #0a0a0a;
+  --bg-card: #111111;
+  --text-main: #f0f0f0;
+  --text-muted: #888888;
+  --accent: #ff4444;
+  --accent-hover: #f0f0f0;
+  --glass-border: #333333;
+  --glass-shadow: none;
+  --success: #ff4444;
+  --custom-bg-pattern: none;
 }
 
 * {
@@ -19,21 +20,19 @@
 }
 
 body {
-  font-family: 'Inter', sans-serif;
+  font-family: 'Courier New', monospace;
   background: var(--bg-dark);
-  background-image: 
-    radial-gradient(at 0% 0%, hsla(253,16%,7%,1) 0, transparent 50%), 
-    radial-gradient(at 50% 0%, hsla(225,39%,30%,0.2) 0, transparent 50%), 
-    radial-gradient(at 100% 0%, hsla(339,49%,30%,0.2) 0, transparent 50%);
-  background-attachment: fixed;
+  background-image: var(--custom-bg-pattern);
   color: var(--text-main);
   min-height: 100vh;
-  padding: 2rem;
+  padding: 0;
+  margin: 0;
 }
 
 h1, h2, h3, h4 {
-  font-weight: 800;
-  letter-spacing: -0.02em;
+  font-weight: 900;
+  letter-spacing: 2px;
+  text-transform: uppercase;
 }
 
 p {
@@ -52,9 +51,9 @@ button {
   width: 8px;
 }
 ::-webkit-scrollbar-track {
-  background: rgba(0,0,0,0.2);
+  background: var(--bg-dark);
 }
 ::-webkit-scrollbar-thumb {
-  background: var(--accent);
-  border-radius: 4px;
+  background: var(--text-main);
+  border: 1px solid var(--bg-dark);
 }

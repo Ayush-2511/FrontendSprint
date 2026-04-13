@@ -92,3 +92,52 @@ Do not return any extra text. Make sure pros and cons explicitly start with 'Pro
   const content = data.choices[0].message.content;
   return JSON.parse(content);
 };
+
+export const compareTeams = async (teamA, teamB) => {
+  const apiKey = import.meta.env.VITE_GROQ_API_KEY;
+  if (!apiKey) throw new Error('Missing VITE_GROQ_API_KEY in environment');
+  
+  const teamANames = teamA.map(p => `${p.name} (Types: ${p.types.join(", ")})`).join(", ");
+  const teamBNames = teamB.map(p => `${p.name} (Types: ${p.types.join(", ")})`).join(", ");
+  
+  const payload = {
+    model: "llama-3.3-70b-versatile",
+    response_format: { type: "json_object" },
+    messages: [
+      {
+        role: "system",
+        content: `You are a professional Pokemon esports analyst. The user will provide two Pokemon teams (Team A and Team B). Your task is to analyze a hypothetical team battle between them. You MUST output your response ONLY as a JSON object with this exact structure:
+{
+  "team1_pros_cons": ["Pro: [reason]", "Con: [reason]", ...],
+  "team2_pros_cons": ["Pro: [reason]", "Con: [reason]", ...],
+  "strategic_breakdown": "A brief structural paragraph of how their elemental types, synergies, and overall team composition intersect in a battle.",
+  "verdict": "Which Team wins the matchup and why."
+}
+Do not return any extra text. Make sure pros and cons explicitly start with 'Pro:' or 'Con:'.`
+      },
+      {
+        role: "user",
+        content: `Compare Team A: ${teamANames} vs Team B: ${teamBNames}. Who emerges victorious?`
+      }
+    ],
+    temperature: 0.7,
+  };
+
+  const response = await fetch("https://api.groq.com/openai/v1/chat/completions", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "Authorization": `Bearer ${apiKey}`
+    },
+    body: JSON.stringify(payload)
+  });
+
+  if (!response.ok) {
+    const errText = await response.text();
+    throw new Error(`Groq API Error: ${errText}`);
+  }
+
+  const data = await response.json();
+  const content = data.choices[0].message.content;
+  return JSON.parse(content);
+};
