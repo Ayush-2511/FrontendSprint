@@ -405,179 +405,183 @@ function App() {
 
       <aside>
         <div className="team-sidebar">
-          <div className="mode-tabs">
-             <button className={`mode-tab ${appMode === 'counter' ? 'active' : ''}`} onClick={() => toggleMode('counter')}>
-               <ShieldHalf size={16} /> Builder
-             </button>
-             <button className={`mode-tab ${appMode === 'compare' ? 'active' : ''}`} onClick={() => toggleMode('compare')}>
-               <Swords size={16} /> Duel
-             </button>
-             <button className={`mode-tab ${appMode === 'team_compare' ? 'active' : ''}`} onClick={() => toggleMode('team_compare')}>
-               <Users size={16} /> Teams
-             </button>
+          <div className="sidebar-header">
+            <div className="mode-tabs">
+               <button className={`mode-tab ${appMode === 'counter' ? 'active' : ''}`} onClick={() => toggleMode('counter')}>
+                 <ShieldHalf size={16} /> Builder
+               </button>
+               <button className={`mode-tab ${appMode === 'compare' ? 'active' : ''}`} onClick={() => toggleMode('compare')}>
+                 <Swords size={16} /> Duel
+               </button>
+               <button className={`mode-tab ${appMode === 'team_compare' ? 'active' : ''}`} onClick={() => toggleMode('team_compare')}>
+                 <Users size={16} /> Teams
+               </button>
+            </div>
           </div>
 
-          <h2>
-            {appMode === 'counter' ? "Opponent's Team" : (appMode === 'compare' ? "Duel Matchup" : "Draft Teams")}
-            {appMode !== 'team_compare' && <span className="team-count">{team.length} / {limitConfig}</span>}
-          </h2>
-          
-          {appMode === 'team_compare' ? (
-            <div className="team-split-draft">
-               <div className={`draft-side ${draftingTarget === 'A' ? 'active' : ''}`} onClick={() => setDraftingTarget('A')}>
-                 <h3 style={{display: 'flex', justifyContent: 'space-between'}}>Team A <span className="team-count">{team.length} / 6</span></h3>
-                 <div className="selected-slots" style={{ gridTemplateColumns: 'repeat(3, 1fr)' }}>
-                    {Array.from({ length: 6 }).map((_, i) => {
-                      const p = team[i];
-                      return (
-                        <div key={i} className={`selected-slot ${p ? 'filled' : ''}`}>
-                          {p && (
-                            <>
-                              <img src={p.image} alt={p.name} />
-                              <button className="remove-btn" onClick={(e) => { e.stopPropagation(); togglePokemon(p, 'A'); }}>
-                                <X size={14} />
-                              </button>
-                            </>
-                          )}
-                        </div>
-                      );
-                    })}
+          <div className="sidebar-inner">
+            <h2>
+              {appMode === 'counter' ? "Opponent's Team" : (appMode === 'compare' ? "Duel Matchup" : "Draft Teams")}
+              {appMode !== 'team_compare' && <span className="team-count">{team.length} / {limitConfig}</span>}
+            </h2>
+            
+            {appMode === 'team_compare' ? (
+              <div className="team-split-draft">
+                 <div className={`draft-side ${draftingTarget === 'A' ? 'active' : ''}`} onClick={() => setDraftingTarget('A')}>
+                   <h3 style={{display: 'flex', justifyContent: 'space-between'}}>Team A <span className="team-count">{team.length} / 6</span></h3>
+                   <div className="selected-slots" style={{ gridTemplateColumns: 'repeat(3, 1fr)' }}>
+                      {Array.from({ length: 6 }).map((_, i) => {
+                        const p = team[i];
+                        return (
+                          <div key={i} className={`selected-slot ${p ? 'filled' : ''}`}>
+                            {p && (
+                              <>
+                                <img src={p.image} alt={p.name} />
+                                <button className="remove-btn" onClick={(e) => { e.stopPropagation(); togglePokemon(p, 'A'); }}>
+                                  <X size={14} />
+                                </button>
+                              </>
+                            )}
+                          </div>
+                        );
+                      })}
+                   </div>
                  </div>
-               </div>
-               
-               <div className={`draft-side ${draftingTarget === 'B' ? 'active' : ''}`} onClick={() => setDraftingTarget('B')} style={{marginTop: '1.5rem'}}>
-                 <h3 style={{display: 'flex', justifyContent: 'space-between'}}>Team B <span className="team-count">{teamB.length} / 6</span></h3>
-                 <div className="selected-slots" style={{ gridTemplateColumns: 'repeat(3, 1fr)' }}>
-                    {Array.from({ length: 6 }).map((_, i) => {
-                      const p = teamB[i];
-                      return (
-                        <div key={i} className={`selected-slot ${p ? 'filled' : ''}`}>
-                          {p && (
-                            <>
-                              <img src={p.image} alt={p.name} />
-                              <button className="remove-btn" onClick={(e) => { e.stopPropagation(); togglePokemon(p, 'B'); }}>
-                                <X size={14} />
-                              </button>
-                            </>
-                          )}
-                        </div>
-                      );
-                    })}
+                 
+                 <div className={`draft-side ${draftingTarget === 'B' ? 'active' : ''}`} onClick={() => setDraftingTarget('B')} style={{marginTop: '1.5rem'}}>
+                   <h3 style={{display: 'flex', justifyContent: 'space-between'}}>Team B <span className="team-count">{teamB.length} / 6</span></h3>
+                   <div className="selected-slots" style={{ gridTemplateColumns: 'repeat(3, 1fr)' }}>
+                      {Array.from({ length: 6 }).map((_, i) => {
+                        const p = teamB[i];
+                        return (
+                          <div key={i} className={`selected-slot ${p ? 'filled' : ''}`}>
+                            {p && (
+                              <>
+                                <img src={p.image} alt={p.name} />
+                                <button className="remove-btn" onClick={(e) => { e.stopPropagation(); togglePokemon(p, 'B'); }}>
+                                  <X size={14} />
+                                </button>
+                              </>
+                            )}
+                          </div>
+                        );
+                      })}
+                   </div>
                  </div>
-               </div>
-            </div>
-          ) : (
-            <div className="selected-slots" style={{ gridTemplateColumns: appMode === 'compare' ? 'repeat(2, 1fr)' : 'repeat(3, 1fr)' }}>
-              {Array.from({ length: limitConfig }).map((_, i) => {
-                const p = team[i];
-                return (
-                  <div key={i} className={`selected-slot ${p ? 'filled' : ''}`}>
-                    {p && (
-                      <>
-                        <img src={p.image} alt={p.name} />
-                        <button className="remove-btn" onClick={() => togglePokemon(p)}>
-                          <X size={14} />
-                        </button>
-                      </>
-                    )}
-                  </div>
-                );
-              })}
-            </div>
-          )}
-
-          {appMode === 'counter' ? (
-              <div className="settings-panel">
-                <div className="setting-row">
-                  <label htmlFor="team-size" style={{display: 'flex', justifyContent: 'space-between', width: '100%', alignItems: 'center'}}>
-                     Counter-Team Size: <span className="team-size-val">{counterTeamSize}</span>
-                  </label>
-                </div>
-                <div className="setting-row">
-                  <input 
-                      id="team-size" 
-                      type="range" 
-                      min="1" 
-                      max="6" 
-                      value={counterTeamSize} 
-                      onChange={(e) => setCounterTeamSize(Number(e.target.value))}
-                      className="size-slider"
-                    />
-                </div>
-                <div className="setting-row" style={{marginTop: '0.5rem'}}>
-                     <label htmlFor="allow-legendaries" className="checkbox-label">
-                        <input 
-                          id="allow-legendaries" 
-                          type="checkbox" 
-                          checked={allowLegendaries} 
-                          onChange={(e) => setAllowLegendaries(e.target.checked)}
-                        />
-                        <div className="checkbox-custom"></div>
-                        Allow Legendaries
-                     </label>
-                </div>
               </div>
-          ) : (appMode === 'compare' ? (
-              <div className="settings-panel" style={{textAlign: 'center', color: 'var(--text-muted)', fontSize: '0.9rem'}}>
-                 Pick exactly 2 Pokemon from the Pokedex to simulate an AI esports matchup.
-              </div>
-          ) : (
-              <div className="settings-panel" style={{textAlign: 'center', color: 'var(--text-muted)', fontSize: '0.9rem'}}>
-                 Draft 1 to 6 Pokemon per team for analysis. Click Team A or Team B above to focus drafting.
-              </div>
-          ))}
-
-          <button 
-            className="action-btn"
-            disabled={
-               (appMode === 'team_compare' && (team.length === 0 || teamB.length === 0)) ||
-               (appMode !== 'team_compare' && team.length === 0) || 
-               analyzing || 
-               (appMode === 'compare' && team.length !== 2)
-            }
-            onClick={handleAction}
-          >
-            {analyzing 
-               ? <Loader2 className="spinner" style={{width: 20, height: 20, margin: 0, border: 'none' }} /> 
-               : (appMode === 'compare' ? <Swords size={20} /> : (appMode === 'team_compare' ? <Users size={20} /> : <Sparkles size={20} />))
-            }
-            {analyzing ? 'Processing...' : (appMode === 'compare' ? 'Analyze Duel' : (appMode === 'team_compare' ? 'Analyze Teams' : 'Generate Counter'))}
-          </button>
-
-          {error && (
-            <div style={{ marginTop: '1rem', color: '#ef4444', fontSize: '0.9rem' }}>
-              {error}
-            </div>
-          )}
-
-          {appMode === 'counter' && counterPokemons.length > 0 && (
-            <div className="groq-analysis">
-              <h3><BrainCircuit size={20} /> Recommended Counter-Team</h3>
-              
-              <div className="counter-grid">
-                {counterPokemons.map((cp, idx) => (
-                  <div 
-                    key={idx} 
-                    className="counter-card"
-                    onClick={(e) => openDetails(e, cp, true)}
-                  >
-                    <div className="pokemon-card-header">
-                       <span className="pokemon-id">{cp.data ? `#${cp.data.id.toString().padStart(3,'0')}` : ''}</span>
-                       <button className="more-btn" style={{ right: 8, top: 4 }}>
-                         <MoreVertical size={14} />
-                       </button>
+            ) : (
+              <div className="selected-slots" style={{ gridTemplateColumns: appMode === 'compare' ? 'repeat(2, 1fr)' : 'repeat(3, 1fr)' }}>
+                {Array.from({ length: limitConfig }).map((_, i) => {
+                  const p = team[i];
+                  return (
+                    <div key={i} className={`selected-slot ${p ? 'filled' : ''}`}>
+                      {p && (
+                        <>
+                          <img src={p.image} alt={p.name} />
+                          <button className="remove-btn" onClick={() => togglePokemon(p)}>
+                            <X size={14} />
+                          </button>
+                        </>
+                      )}
                     </div>
-                    {cp.data ? (
-                       <img src={cp.data.image} alt={cp.name} className="counter-image" />
-                    ) : (
-                       <div className="counter-fallback">{cp.name}</div>
-                    )}
-                    <div className="counter-name">{cp.name}</div>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
-            </div>
-          )}
+            )}
+
+            {appMode === 'counter' ? (
+                <div className="settings-panel">
+                  <div className="setting-row">
+                    <label htmlFor="team-size" style={{display: 'flex', justifyContent: 'space-between', width: '100%', alignItems: 'center'}}>
+                       Counter-Team Size: <span className="team-size-val">{counterTeamSize}</span>
+                    </label>
+                  </div>
+                  <div className="setting-row">
+                    <input 
+                        id="team-size" 
+                        type="range" 
+                        min="1" 
+                        max="6" 
+                        value={counterTeamSize} 
+                        onChange={(e) => setCounterTeamSize(Number(e.target.value))}
+                        className="size-slider"
+                      />
+                  </div>
+                  <div className="setting-row" style={{marginTop: '0.5rem'}}>
+                       <label htmlFor="allow-legendaries" className="checkbox-label">
+                          <input 
+                            id="allow-legendaries" 
+                            type="checkbox" 
+                            checked={allowLegendaries} 
+                            onChange={(e) => setAllowLegendaries(e.target.checked)}
+                          />
+                          <div className="checkbox-custom"></div>
+                          Allow Legendaries
+                       </label>
+                  </div>
+                </div>
+            ) : (appMode === 'compare' ? (
+                <div className="settings-panel" style={{textAlign: 'center', color: 'var(--text-muted)', fontSize: '0.9rem'}}>
+                   Pick exactly 2 Pokemon from the Pokedex to simulate an AI esports matchup.
+                </div>
+            ) : (
+                <div className="settings-panel" style={{textAlign: 'center', color: 'var(--text-muted)', fontSize: '0.9rem'}}>
+                   Draft 1 to 6 Pokemon per team for analysis. Click Team A or Team B above to focus drafting.
+                </div>
+            ))}
+
+            <button 
+              className="action-btn"
+              disabled={
+                 (appMode === 'team_compare' && (team.length === 0 || teamB.length === 0)) ||
+                 (appMode !== 'team_compare' && team.length === 0) || 
+                 analyzing || 
+                 (appMode === 'compare' && team.length !== 2)
+              }
+              onClick={handleAction}
+            >
+              {analyzing 
+                 ? <Loader2 className="spinner" style={{width: 20, height: 20, margin: 0, border: 'none' }} /> 
+                 : (appMode === 'compare' ? <Swords size={20} /> : (appMode === 'team_compare' ? <Users size={20} /> : <Sparkles size={20} />))
+              }
+              {analyzing ? 'Processing...' : (appMode === 'compare' ? 'Analyze Duel' : (appMode === 'team_compare' ? 'Analyze Teams' : 'Generate Counter'))}
+            </button>
+
+            {error && (
+              <div style={{ marginTop: '1rem', color: '#ef4444', fontSize: '0.9rem' }}>
+                {error}
+              </div>
+            )}
+
+            {appMode === 'counter' && counterPokemons.length > 0 && (
+              <div className="groq-analysis">
+                <h3><BrainCircuit size={20} /> Recommended Counter-Team</h3>
+                
+                <div className="counter-grid">
+                  {counterPokemons.map((cp, idx) => (
+                    <div 
+                      key={idx} 
+                      className="counter-card"
+                      onClick={(e) => openDetails(e, cp, true)}
+                    >
+                      <div className="pokemon-card-header">
+                         <span className="pokemon-id">{cp.data ? `#${cp.data.id.toString().padStart(3,'0')}` : ''}</span>
+                         <button className="more-btn" style={{ right: 8, top: 4 }}>
+                           <MoreVertical size={14} />
+                         </button>
+                      </div>
+                      {cp.data ? (
+                         <img src={cp.data.image} alt={cp.name} className="counter-image" />
+                      ) : (
+                         <div className="counter-fallback">{cp.name}</div>
+                      )}
+                      <div className="counter-name">{cp.name}</div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
         </div>
       </aside>
 
